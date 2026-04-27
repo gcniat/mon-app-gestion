@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'app/home_screen.dart';
 import 'core/constants.dart';
 import 'core/services/preferences_service.dart';
@@ -19,6 +20,15 @@ class GallonManApp extends StatelessWidget {
       title: AppConstants.appName,
       theme: AppTheme.light,
       debugShowCheckedModeBanner: false,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('fr'),
+        Locale('en'),
+      ],
       home: const HomeScreen(),
     );
   }

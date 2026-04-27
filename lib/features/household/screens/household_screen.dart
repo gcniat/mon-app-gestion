@@ -129,7 +129,6 @@ class _HouseholdScreenState extends State<HouseholdScreen> {
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
       initialDateRange: _customRange,
-      locale: const Locale('fr'),
     );
     if (range != null) setState(() => _customRange = range);
   }
