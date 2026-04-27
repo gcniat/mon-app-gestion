@@ -30,12 +30,21 @@ class _StatsScreenState extends State<StatsScreen> {
       ? _allEntries
       : _allEntries.where((e) => e.vehicleId == _selectedVehicle!.id).toList();
 
-  // ── Résumé ───────────────────────────────────────────────────────────
-  double get _totalSpent => _entries.fold(0.0, (s, e) => s + e.totalCost);
-  double get _totalLiters => _entries.fold(0.0, (s, e) => s + e.liters);
-  double get _avgPrice => _entries.isEmpty
-      ? 0.0
-      : _entries.fold(0.0, (s, e) => s + e.pricePerLiter) / _entries.length;
+  // ── Résumé filtré par période ────────────────────────────────────────
+  double get _periodTotalSpent =>
+      _spendingData(_period).fold(0.0, (s, e) => s + e.value);
+
+  double get _periodTotalLiters =>
+      _litersData(_period).fold(0.0, (s, e) => s + e.value);
+
+  double get _periodAvgConsumption {
+    final vals = _consumptionData(_period)
+        .where((e) => e.value > 0)
+        .map((e) => e.value)
+        .toList();
+    if (vals.isEmpty) return 0;
+    return vals.reduce((a, b) => a + b) / vals.length;
+  }
 
   // ── Helpers période ──────────────────────────────────────────────────
   static String _mondayKey(DateTime dt) {
@@ -74,6 +83,17 @@ class _StatsScreenState extends State<StatsScreen> {
     for (final e in _entries) {
       final key = _entryKey(e.date, p);
       if (map.containsKey(key)) map[key] = map[key]! + e.totalCost;
+    }
+    return keys.map((k) => MapEntry(k, map[k]!)).toList();
+  }
+
+  // ── Litres ───────────────────────────────────────────────────────────
+  List<MapEntry<String, double>> _litersData(StatsPeriod p) {
+    final keys = _periodKeys(p);
+    final map = {for (final k in keys) k: 0.0};
+    for (final e in _entries) {
+      final key = _entryKey(e.date, p);
+      if (map.containsKey(key)) map[key] = map[key]! + e.liters;
     }
     return keys.map((k) => MapEntry(k, map[k]!)).toList();
   }
@@ -209,11 +229,11 @@ class _StatsScreenState extends State<StatsScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Cartes résumé
+                      // Cartes résumé (filtrées par période)
                       _SummaryRow(
-                        totalSpent: _totalSpent,
-                        totalLiters: _totalLiters,
-                        avgPrice: _avgPrice,
+                        totalSpent: _periodTotalSpent,
+                        totalLiters: _periodTotalLiters,
+                        avgConsumption: _periodAvgConsumption,
                       ),
                       const SizedBox(height: 24),
 
@@ -269,12 +289,12 @@ class _SectionTitle extends StatelessWidget {
 class _SummaryRow extends StatelessWidget {
   final double totalSpent;
   final double totalLiters;
-  final double avgPrice;
+  final double avgConsumption;
 
   const _SummaryRow({
     required this.totalSpent,
     required this.totalLiters,
-    required this.avgPrice,
+    required this.avgConsumption,
   });
 
   @override
@@ -295,9 +315,11 @@ class _SummaryRow extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
             child: _StatCard(
-                label: 'Prix moy./L',
-                value: AppFormatters.currency(avgPrice),
-                icon: Icons.trending_up)),
+                label: 'Conso. moy.',
+                value: avgConsumption == 0
+                    ? '— L/100'
+                    : '${avgConsumption.toStringAsFixed(1)} L/100',
+                icon: Icons.speed_outlined)),
       ],
     );
   }
