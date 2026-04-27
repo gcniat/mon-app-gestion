@@ -30,20 +30,25 @@ class _StatsScreenState extends State<StatsScreen> {
       ? _allEntries
       : _allEntries.where((e) => e.vehicleId == _selectedVehicle!.id).toList();
 
-  // ── Résumé filtré par période ────────────────────────────────────────
-  double get _periodTotalSpent =>
-      _spendingData(_period).fold(0.0, (s, e) => s + e.value);
+  // ── Résumé : période courante uniquement (dernier bucket) ───────────
+  // "Semaine" = cette semaine, "Mois" = ce mois-ci, "Année" = cette année
+  double get _periodTotalSpent {
+    final data = _spendingData(_period);
+    return data.isEmpty ? 0 : data.last.value;
+  }
 
-  double get _periodTotalLiters =>
-      _litersData(_period).fold(0.0, (s, e) => s + e.value);
+  double get _periodTotalLiters {
+    final data = _litersData(_period);
+    return data.isEmpty ? 0 : data.last.value;
+  }
 
   double get _periodAvgConsumption {
-    final vals = _consumptionData(_period)
-        .where((e) => e.value > 0)
-        .map((e) => e.value)
-        .toList();
-    if (vals.isEmpty) return 0;
-    return vals.reduce((a, b) => a + b) / vals.length;
+    final data = _consumptionData(_period);
+    // Dernier bucket avec une valeur non nulle
+    for (int i = data.length - 1; i >= 0; i--) {
+      if (data[i].value > 0) return data[i].value;
+    }
+    return 0;
   }
 
   // ── Helpers période ──────────────────────────────────────────────────
@@ -229,11 +234,12 @@ class _StatsScreenState extends State<StatsScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Cartes résumé (filtrées par période)
+                      // Cartes résumé (période courante)
                       _SummaryRow(
                         totalSpent: _periodTotalSpent,
                         totalLiters: _periodTotalLiters,
                         avgConsumption: _periodAvgConsumption,
+                        period: _period,
                       ),
                       const SizedBox(height: 24),
 
@@ -290,36 +296,59 @@ class _SummaryRow extends StatelessWidget {
   final double totalSpent;
   final double totalLiters;
   final double avgConsumption;
+  final StatsPeriod period;
 
   const _SummaryRow({
     required this.totalSpent,
     required this.totalLiters,
     required this.avgConsumption,
+    required this.period,
   });
+
+  String get _periodLabel {
+    switch (period) {
+      case StatsPeriod.weekly: return 'cette semaine';
+      case StatsPeriod.monthly: return 'ce mois-ci';
+      case StatsPeriod.yearly: return 'cette année';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-            child: _StatCard(
-                label: 'Total dépensé',
-                value: AppFormatters.currency(totalSpent),
-                icon: Icons.payments_outlined)),
-        const SizedBox(width: 8),
-        Expanded(
-            child: _StatCard(
-                label: 'Litres',
-                value: '${totalLiters.toStringAsFixed(1)} L',
-                icon: Icons.local_gas_station_outlined)),
-        const SizedBox(width: 8),
-        Expanded(
-            child: _StatCard(
-                label: 'Conso. moy.',
-                value: avgConsumption == 0
-                    ? '— L/100'
-                    : '${avgConsumption.toStringAsFixed(1)} L/100',
-                icon: Icons.speed_outlined)),
+        Text(
+          _periodLabel,
+          style: TextStyle(
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+                child: _StatCard(
+                    label: 'Dépenses',
+                    value: AppFormatters.currency(totalSpent),
+                    icon: Icons.payments_outlined)),
+            const SizedBox(width: 8),
+            Expanded(
+                child: _StatCard(
+                    label: 'Litres',
+                    value: '${totalLiters.toStringAsFixed(1)} L',
+                    icon: Icons.local_gas_station_outlined)),
+            const SizedBox(width: 8),
+            Expanded(
+                child: _StatCard(
+                    label: 'Conso. moy.',
+                    value: avgConsumption == 0
+                        ? '— L/100'
+                        : '${avgConsumption.toStringAsFixed(1)} L/100',
+                    icon: Icons.speed_outlined)),
+          ],
+        ),
       ],
     );
   }
