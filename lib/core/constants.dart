@@ -1,5 +1,5 @@
 class AppConstants {
-  static const String appName = 'FuelTracker';
+  static const String appName = 'Gallon Man';
   static const String dbName = 'fueltracker.db';
   static const int dbVersion = 1;
 
