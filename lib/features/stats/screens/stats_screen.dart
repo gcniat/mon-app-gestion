@@ -5,6 +5,7 @@ import '../../../data/models/fuel_entry.dart';
 import '../../../data/models/vehicle.dart';
 import '../../../data/repositories/fuel_entry_repository.dart';
 import '../../../data/repositories/vehicle_repository.dart';
+import '../widgets/consumption_chart.dart';
 import '../widgets/monthly_bar_chart.dart';
 import '../widgets/price_line_chart.dart';
 
@@ -62,6 +63,74 @@ class _StatsScreenState extends State<StatsScreen> {
         .entries
         .map((e) => FlSpot(e.key.toDouble(), e.value.pricePerLiter))
         .toList();
+  }
+
+  // Calcule les points (date, L/100km) par véhicule entre pleins consécutifs
+  List<(String, double)> get _consumptionPoints {
+    final result = <(String, double)>[];
+    // Grouper par véhicule pour conserver la séquence d'odomètre
+    final byVehicle = <int, List<FuelEntry>>{};
+    for (final e in _entries.where((e) => e.odometer != null)) {
+      byVehicle.putIfAbsent(e.vehicleId, () => []).add(e);
+    }
+    for (final entries in byVehicle.values) {
+      entries.sort((a, b) => a.date.compareTo(b.date));
+      for (int i = 1; i < entries.length; i++) {
+        final prev = entries[i - 1];
+        final curr = entries[i];
+        final distance = curr.odometer! - prev.odometer!;
+        if (distance > 0 && curr.liters > 0) {
+          final conso = (curr.liters / distance) * 100;
+          if (conso > 0 && conso < 50) result.add((curr.date, conso));
+        }
+      }
+    }
+    return result;
+  }
+
+  List<MapEntry<String, double>> get _monthlyConsumption {
+    final now = DateTime.now();
+    final map = <String, List<double>>{};
+    for (int i = 5; i >= 0; i--) {
+      final m = DateTime(now.year, now.month - i);
+      map['${m.year}-${m.month.toString().padLeft(2, '0')}'] = [];
+    }
+    for (final (date, conso) in _consumptionPoints) {
+      final key = date.substring(0, 7);
+      if (map.containsKey(key)) map[key]!.add(conso);
+    }
+    return map.entries.map((e) {
+      final avg = e.value.isEmpty
+          ? 0.0
+          : e.value.reduce((a, b) => a + b) / e.value.length;
+      return MapEntry(e.key, avg);
+    }).toList();
+  }
+
+  List<MapEntry<String, double>> get _weeklyConsumption {
+    final now = DateTime.now();
+    // Lundi de la semaine courante
+    final thisMonday = now.subtract(Duration(days: now.weekday - 1));
+    final map = <String, List<double>>{};
+    for (int i = 7; i >= 0; i--) {
+      final monday = thisMonday.subtract(Duration(days: i * 7));
+      final key =
+          '${monday.year}-${monday.month.toString().padLeft(2, '0')}-${monday.day.toString().padLeft(2, '0')}';
+      map[key] = [];
+    }
+    for (final (date, conso) in _consumptionPoints) {
+      final dt = DateTime.parse(date);
+      final monday = dt.subtract(Duration(days: dt.weekday - 1));
+      final key =
+          '${monday.year}-${monday.month.toString().padLeft(2, '0')}-${monday.day.toString().padLeft(2, '0')}';
+      if (map.containsKey(key)) map[key]!.add(conso);
+    }
+    return map.entries.map((e) {
+      final avg = e.value.isEmpty
+          ? 0.0
+          : e.value.reduce((a, b) => a + b) / e.value.length;
+      return MapEntry(e.key, avg);
+    }).toList();
   }
 
   @override
@@ -140,8 +209,17 @@ class _StatsScreenState extends State<StatsScreen> {
                         _SectionTitle('Évolution du prix au litre (\$/L)'),
                         const SizedBox(height: 8),
                         PriceLineChart(spots: _priceTrend),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 24),
                       ],
+
+                      // Graphique consommation L/100km
+                      _SectionTitle('Consommation moy. (L/100 km)'),
+                      const SizedBox(height: 8),
+                      ConsumptionChart(
+                        monthlyData: _monthlyConsumption,
+                        weeklyData: _weeklyConsumption,
+                      ),
+                      const SizedBox(height: 16),
                     ],
                   ),
                 ),
