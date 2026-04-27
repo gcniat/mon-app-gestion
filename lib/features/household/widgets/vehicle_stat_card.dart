@@ -71,12 +71,11 @@ class VehicleStatCard extends StatelessWidget {
 
             // Stats en ligne
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _Metric('Total', AppFormatters.currency(totalSpent)),
-                _Metric('Litres', '${totalLiters.toStringAsFixed(1)} L'),
-                _Metric('Prix moy./L', AppFormatters.currency(avgPrice)),
-                _Metric('Relevés', '$entryCount'),
+                Flexible(child: _Metric('Total', AppFormatters.currency(totalSpent))),
+                Flexible(child: _Metric('Litres', '${totalLiters.toStringAsFixed(1)} L')),
+                Flexible(child: _Metric('Prix moy./L', AppFormatters.currency(avgPrice))),
+                Flexible(child: _Metric('Relevés', '$entryCount')),
               ],
             ),
           ],

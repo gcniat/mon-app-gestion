@@ -57,16 +57,15 @@ class FuelEntryCard extends StatelessWidget {
                   const SizedBox(height: 4),
 
                   // Litres + prix/L
-                  Row(
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
                     children: [
                       _Chip('${entry.liters.toStringAsFixed(2)} L'),
-                      const SizedBox(width: 8),
                       _Chip(
                           '${AppFormatters.currency(entry.pricePerLiter)}/L'),
-                      if (entry.odometer != null) ...[
-                        const SizedBox(width: 8),
+                      if (entry.odometer != null)
                         _Chip('${entry.odometer} km'),
-                      ],
                     ],
                   ),
 
