@@ -13,16 +13,16 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
-  static const _screens = <Widget>[
-    VehicleListScreen(),
-    StatsScreen(),
-    HouseholdScreen(),
-  ];
+  Widget get _currentScreen => switch (_currentIndex) {
+        1 => const StatsScreen(),
+        2 => const HouseholdScreen(),
+        _ => const VehicleListScreen(),
+      };
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: _currentScreen,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (i) => setState(() => _currentIndex = i),
