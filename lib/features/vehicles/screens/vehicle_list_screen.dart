@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants.dart';
 import '../../../data/models/vehicle.dart';
 import '../../../data/repositories/vehicle_repository.dart';
-import '../../fuel/screens/fuel_entry_form_screen.dart';
+import '../../fuel/screens/fuel_records_screen.dart';
 import '../widgets/vehicle_card.dart';
 import 'vehicle_form_screen.dart';
 
@@ -88,8 +88,8 @@ class _VehicleListScreenState extends State<VehicleListScreen> {
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => FuelEntryFormScreen(
-                              vehicle: _vehicles[i]),
+                          builder: (_) =>
+                              FuelRecordsScreen(vehicle: _vehicles[i]),
                         ),
                       ),
                       onEdit: () => _openForm(vehicle: _vehicles[i]),
