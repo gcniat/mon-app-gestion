@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../features/household/screens/household_screen.dart';
+import '../features/settings/screens/settings_screen.dart';
 import '../features/stats/screens/stats_screen.dart';
 import '../features/vehicles/screens/vehicle_list_screen.dart';
 
@@ -16,6 +17,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget get _currentScreen => switch (_currentIndex) {
         1 => const StatsScreen(),
         2 => const HouseholdScreen(),
+        3 => const SettingsScreen(),
         _ => const VehicleListScreen(),
       };
 
@@ -36,9 +38,13 @@ class _HomeScreenState extends State<HomeScreen> {
               selectedIcon: Icon(Icons.bar_chart),
               label: 'Statistiques'),
           NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: 'Foyer'),
+              icon: Icon(Icons.local_shipping_outlined),
+              selectedIcon: Icon(Icons.local_shipping),
+              label: 'Flotte'),
+          NavigationDestination(
+              icon: Icon(Icons.settings_outlined),
+              selectedIcon: Icon(Icons.settings),
+              label: 'Paramètres'),
         ],
       ),
     );

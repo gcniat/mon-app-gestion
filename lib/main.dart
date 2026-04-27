@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'app/home_screen.dart';
 import 'core/constants.dart';
+import 'core/services/preferences_service.dart';
 import 'core/theme.dart';
 
-void main() {
-  runApp(const FuelTrackerApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await PreferencesService().init();
+  runApp(const GallonManApp());
 }
 
-class FuelTrackerApp extends StatelessWidget {
-  const FuelTrackerApp({super.key});
+class GallonManApp extends StatelessWidget {
+  const GallonManApp({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -1,11 +1,15 @@
 import 'package:intl/intl.dart';
+import 'services/preferences_service.dart';
 
 class AppFormatters {
-  static final _currency = NumberFormat('\$#,##0.00', 'en_US');
+  static final _numberFmt = NumberFormat('#,##0.00', 'en_US');
   static final _dateDisplay = DateFormat('dd/MM/yyyy');
   static final _dateStorage = DateFormat('yyyy-MM-dd');
 
-  static String currency(double amount) => _currency.format(amount);
+  static String currency(double amount) {
+    final sym = PreferencesService().currency.symbol;
+    return '$sym ${_numberFmt.format(amount)}';
+  }
 
   static String dateToDisplay(String stored) {
     final dt = DateTime.parse(stored);

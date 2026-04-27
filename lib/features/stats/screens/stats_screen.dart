@@ -24,31 +24,76 @@ class _StatsScreenState extends State<StatsScreen> {
   List<FuelEntry> _allEntries = [];
   Vehicle? _selectedVehicle;
   StatsPeriod _period = StatsPeriod.monthly;
+  DateTimeRange? _customRange;
   bool _loading = true;
 
   List<FuelEntry> get _entries => _selectedVehicle == null
       ? _allEntries
       : _allEntries.where((e) => e.vehicleId == _selectedVehicle!.id).toList();
 
-  // ── Résumé : période courante uniquement (dernier bucket) ───────────
-  // "Semaine" = cette semaine, "Mois" = ce mois-ci, "Année" = cette année
-  double get _periodTotalSpent {
-    final data = _spendingData(_period);
-    return data.isEmpty ? 0 : data.last.value;
-  }
-
-  double get _periodTotalLiters {
-    final data = _litersData(_period);
-    return data.isEmpty ? 0 : data.last.value;
-  }
-
-  double get _periodAvgConsumption {
-    final data = _consumptionData(_period);
-    // Dernier bucket avec une valeur non nulle
-    for (int i = data.length - 1; i >= 0; i--) {
-      if (data[i].value > 0) return data[i].value;
+  // ── Entrées filtrées par date range ou période courante ──────────────
+  List<FuelEntry> get _summaryEntries {
+    if (_customRange != null) {
+      final start = AppFormatters.dateToStorage(_customRange!.start);
+      final end = AppFormatters.dateToStorage(_customRange!.end);
+      return _entries.where((e) =>
+          e.date.compareTo(start) >= 0 && e.date.compareTo(end) <= 0).toList();
     }
-    return 0;
+    // Période courante (dernier bucket)
+    final now = DateTime.now();
+    switch (_period) {
+      case StatsPeriod.weekly:
+        final monday = now.subtract(Duration(days: now.weekday - 1));
+        final key = _mondayKey(monday);
+        return _entries
+            .where((e) => _mondayKey(DateTime.parse(e.date)) == key)
+            .toList();
+      case StatsPeriod.monthly:
+        final key = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+        return _entries.where((e) => e.date.startsWith(key)).toList();
+      case StatsPeriod.yearly:
+        return _entries.where((e) => e.date.startsWith('${now.year}')).toList();
+    }
+  }
+
+  double get _summarySpent =>
+      _summaryEntries.fold(0.0, (s, e) => s + e.totalCost);
+
+  double get _summaryLiters =>
+      _summaryEntries.fold(0.0, (s, e) => s + e.liters);
+
+  double get _summaryConsumption =>
+      _avgConsumptionFrom(_summaryEntries);
+
+  double _avgConsumptionFrom(List<FuelEntry> entries) {
+    final byVehicle = <int, List<FuelEntry>>{};
+    for (final e in entries.where((e) => e.odometer != null)) {
+      byVehicle.putIfAbsent(e.vehicleId, () => []).add(e);
+    }
+    final consos = <double>[];
+    for (final list in byVehicle.values) {
+      list.sort((a, b) => a.date.compareTo(b.date));
+      for (int i = 1; i < list.length; i++) {
+        final dist = list[i].odometer! - list[i - 1].odometer!;
+        if (dist > 0 && list[i].liters > 0) {
+          final c = (list[i].liters / dist) * 100;
+          if (c > 0 && c < 50) consos.add(c);
+        }
+      }
+    }
+    if (consos.isEmpty) return 0;
+    return consos.reduce((a, b) => a + b) / consos.length;
+  }
+
+  Future<void> _pickDateRange() async {
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+      initialDateRange: _customRange,
+      locale: const Locale('fr'),
+    );
+    if (range != null) setState(() => _customRange = range);
   }
 
   // ── Helpers période ──────────────────────────────────────────────────
@@ -88,17 +133,6 @@ class _StatsScreenState extends State<StatsScreen> {
     for (final e in _entries) {
       final key = _entryKey(e.date, p);
       if (map.containsKey(key)) map[key] = map[key]! + e.totalCost;
-    }
-    return keys.map((k) => MapEntry(k, map[k]!)).toList();
-  }
-
-  // ── Litres ───────────────────────────────────────────────────────────
-  List<MapEntry<String, double>> _litersData(StatsPeriod p) {
-    final keys = _periodKeys(p);
-    final map = {for (final k in keys) k: 0.0};
-    for (final e in _entries) {
-      final key = _entryKey(e.date, p);
-      if (map.containsKey(key)) map[key] = map[key]! + e.liters;
     }
     return keys.map((k) => MapEntry(k, map[k]!)).toList();
   }
@@ -229,17 +263,28 @@ class _StatsScreenState extends State<StatsScreen> {
                           ),
                         ],
                         selected: {_period},
-                        onSelectionChanged: (s) =>
-                            setState(() => _period = s.first),
+                        onSelectionChanged: (s) => setState(() {
+                          _period = s.first;
+                          _customRange = null;
+                        }),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 8),
 
-                      // Cartes résumé (période courante)
+                      // Sélecteur de plage personnalisée
+                      _DateRangeBar(
+                        range: _customRange,
+                        onPick: _pickDateRange,
+                        onClear: () => setState(() => _customRange = null),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Cartes résumé (période ou plage courante)
                       _SummaryRow(
-                        totalSpent: _periodTotalSpent,
-                        totalLiters: _periodTotalLiters,
-                        avgConsumption: _periodAvgConsumption,
-                        period: _period,
+                        totalSpent: _summarySpent,
+                        totalLiters: _summaryLiters,
+                        avgConsumption: _summaryConsumption,
+                        period: _customRange == null ? _period : null,
+                        customRange: _customRange,
                       ),
                       const SizedBox(height: 24),
 
@@ -292,24 +337,77 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
+class _DateRangeBar extends StatelessWidget {
+  final DateTimeRange? range;
+  final VoidCallback onPick;
+  final VoidCallback onClear;
+
+  const _DateRangeBar(
+      {required this.range, required this.onPick, required this.onClear});
+
+  @override
+  Widget build(BuildContext context) {
+    if (range == null) {
+      return OutlinedButton.icon(
+        icon: const Icon(Icons.date_range, size: 18),
+        label: const Text('Période personnalisée'),
+        onPressed: onPick,
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.date_range, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Du ${AppFormatters.dateToDisplay(AppFormatters.dateToStorage(range!.start))}'
+              ' au ${AppFormatters.dateToDisplay(AppFormatters.dateToStorage(range!.end))}',
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 18),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: onClear,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SummaryRow extends StatelessWidget {
   final double totalSpent;
   final double totalLiters;
   final double avgConsumption;
-  final StatsPeriod period;
+  final StatsPeriod? period;
+  final DateTimeRange? customRange;
 
   const _SummaryRow({
     required this.totalSpent,
     required this.totalLiters,
     required this.avgConsumption,
-    required this.period,
+    this.period,
+    this.customRange,
   });
 
-  String get _periodLabel {
+  String get _label {
+    if (customRange != null) {
+      return 'Du ${AppFormatters.dateToDisplay(AppFormatters.dateToStorage(customRange!.start))}'
+          ' au ${AppFormatters.dateToDisplay(AppFormatters.dateToStorage(customRange!.end))}';
+    }
     switch (period) {
-      case StatsPeriod.weekly: return 'cette semaine';
-      case StatsPeriod.monthly: return 'ce mois-ci';
-      case StatsPeriod.yearly: return 'cette année';
+      case StatsPeriod.weekly: return 'Cette semaine';
+      case StatsPeriod.monthly: return 'Ce mois-ci';
+      case StatsPeriod.yearly: return 'Cette année';
+      case null: return '';
     }
   }
 
@@ -319,7 +417,7 @@ class _SummaryRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          _periodLabel,
+          _label,
           style: TextStyle(
             fontSize: 12,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
