@@ -29,7 +29,8 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     _nameCtrl = TextEditingController(text: widget.vehicle?.name ?? '');
     _brandCtrl = TextEditingController(text: widget.vehicle?.brand ?? '');
     _modelCtrl = TextEditingController(text: widget.vehicle?.model ?? '');
-    _plateCtrl = TextEditingController(text: widget.vehicle?.licensePlate ?? '');
+    _plateCtrl =
+        TextEditingController(text: widget.vehicle?.licensePlate ?? '');
   }
 
   @override
@@ -70,55 +71,67 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? 'Modifier le véhicule' : 'Ajouter un véhicule'),
+        title:
+            Text(_isEditing ? 'Modifier le véhicule' : 'Ajouter un véhicule'),
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            TextFormField(
-              controller: _nameCtrl,
-              decoration: const InputDecoration(
-                  labelText: 'Nom du véhicule *', prefixIcon: Icon(Icons.label)),
-              textCapitalization: TextCapitalization.words,
-              validator: _required,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _brandCtrl,
-              decoration: const InputDecoration(
-                  labelText: 'Marque *', prefixIcon: Icon(Icons.business)),
-              textCapitalization: TextCapitalization.words,
-              validator: _required,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _modelCtrl,
-              decoration: const InputDecoration(
-                  labelText: 'Modèle *',
-                  prefixIcon: Icon(Icons.directions_car)),
-              textCapitalization: TextCapitalization.words,
-              validator: _required,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _plateCtrl,
-              decoration: const InputDecoration(
-                  labelText: 'Plaque d\'immatriculation *',
-                  prefixIcon: Icon(Icons.pin)),
-              textCapitalization: TextCapitalization.characters,
-              validator: _required,
-            ),
-            const SizedBox(height: 32),
-            FilledButton.icon(
-              onPressed: _save,
-              icon: Icon(_isEditing ? Icons.save : Icons.add),
-              label: Text(_isEditing
-                  ? 'Enregistrer les modifications'
-                  : 'Ajouter le véhicule'),
-            ),
-          ],
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              TextFormField(
+                controller: _nameCtrl,
+                autofocus: true,
+                decoration: const InputDecoration(
+                    labelText: 'Nom du véhicule *',
+                    prefixIcon: Icon(Icons.label)),
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                validator: _required,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _brandCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Marque *',
+                    prefixIcon: Icon(Icons.business)),
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                validator: _required,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _modelCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Modèle *',
+                    prefixIcon: Icon(Icons.directions_car)),
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                validator: _required,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _plateCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Plaque d\'immatriculation *',
+                    prefixIcon: Icon(Icons.pin)),
+                textCapitalization: TextCapitalization.characters,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _save(),
+                validator: _required,
+              ),
+              const SizedBox(height: 32),
+              FilledButton.icon(
+                onPressed: _save,
+                icon: Icon(_isEditing ? Icons.save : Icons.add),
+                label: Text(_isEditing
+                    ? 'Enregistrer les modifications'
+                    : 'Ajouter le véhicule'),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/formatters.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../../data/models/fuel_entry.dart';
 import '../../../data/models/vehicle.dart';
 import '../../../data/repositories/fuel_entry_repository.dart';
@@ -39,6 +40,7 @@ class _FuelRecordsScreenState extends State<FuelRecordsScreen> {
   }
 
   Future<void> _openForm({FuelEntry? entry}) async {
+    final isEdit = entry != null;
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
@@ -46,7 +48,14 @@ class _FuelRecordsScreenState extends State<FuelRecordsScreen> {
             FuelEntryFormScreen(vehicle: widget.vehicle, entry: entry),
       ),
     );
-    if (result == true) _load();
+    if (result == true) {
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(isEdit ? 'Relevé modifié' : 'Relevé enregistré'),
+        ));
+      }
+    }
   }
 
   Future<void> _confirmDelete(FuelEntry entry) async {
@@ -70,7 +79,12 @@ class _FuelRecordsScreenState extends State<FuelRecordsScreen> {
     );
     if (confirmed == true) {
       await _repo.delete(entry.id!);
-      _load();
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Relevé supprimé')),
+        );
+      }
     }
   }
 
@@ -85,20 +99,16 @@ class _FuelRecordsScreenState extends State<FuelRecordsScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
-                // Bandeau résumé
-                if (_entries.isNotEmpty) _SummaryBanner(
-                  count: _entries.length,
-                  totalSpent: _totalSpent,
-                ),
-
-                // Liste
+                if (_entries.isNotEmpty)
+                  _SummaryBanner(
+                      count: _entries.length, totalSpent: _totalSpent),
                 Expanded(
                   child: _entries.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'Aucun relevé.\nAppuyez sur + pour en ajouter un.',
-                            textAlign: TextAlign.center,
-                          ),
+                      ? const EmptyState(
+                          icon: Icons.local_gas_station_outlined,
+                          message: 'Aucun relevé pour ce véhicule',
+                          hint:
+                              'Appuyez sur + pour enregistrer un plein.',
                         )
                       : RefreshIndicator(
                           onRefresh: _load,
@@ -141,9 +151,8 @@ class _SummaryBanner extends StatelessWidget {
         children: [
           _Stat(label: 'Relevés', value: '$count'),
           _Stat(
-            label: 'Total dépensé',
-            value: AppFormatters.currency(totalSpent),
-          ),
+              label: 'Total dépensé',
+              value: AppFormatters.currency(totalSpent)),
         ],
       ),
     );
@@ -166,7 +175,8 @@ class _Stat extends StatelessWidget {
                 fontSize: 18,
                 color: colors.onPrimaryContainer)),
         Text(label,
-            style: TextStyle(fontSize: 12, color: colors.onPrimaryContainer)),
+            style:
+                TextStyle(fontSize: 12, color: colors.onPrimaryContainer)),
       ],
     );
   }
