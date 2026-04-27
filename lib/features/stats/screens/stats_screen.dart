@@ -1,10 +1,10 @@
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../../../core/formatters.dart';
 import '../../../data/models/fuel_entry.dart';
 import '../../../data/models/vehicle.dart';
 import '../../../data/repositories/fuel_entry_repository.dart';
 import '../../../data/repositories/vehicle_repository.dart';
+import '../stats_period.dart';
 import '../widgets/consumption_chart.dart';
 import '../widgets/monthly_bar_chart.dart';
 import '../widgets/price_line_chart.dart';
@@ -23,52 +23,79 @@ class _StatsScreenState extends State<StatsScreen> {
   List<Vehicle> _vehicles = [];
   List<FuelEntry> _allEntries = [];
   Vehicle? _selectedVehicle;
+  StatsPeriod _period = StatsPeriod.monthly;
   bool _loading = true;
 
   List<FuelEntry> get _entries => _selectedVehicle == null
       ? _allEntries
-      : _allEntries
-          .where((e) => e.vehicleId == _selectedVehicle!.id)
-          .toList();
+      : _allEntries.where((e) => e.vehicleId == _selectedVehicle!.id).toList();
 
-  double get _totalSpent =>
-      _entries.fold(0.0, (s, e) => s + e.totalCost);
-
-  double get _totalLiters =>
-      _entries.fold(0.0, (s, e) => s + e.liters);
-
+  // ── Résumé ───────────────────────────────────────────────────────────
+  double get _totalSpent => _entries.fold(0.0, (s, e) => s + e.totalCost);
+  double get _totalLiters => _entries.fold(0.0, (s, e) => s + e.liters);
   double get _avgPrice => _entries.isEmpty
       ? 0.0
-      : _entries.fold(0.0, (s, e) => s + e.pricePerLiter) /
-          _entries.length;
+      : _entries.fold(0.0, (s, e) => s + e.pricePerLiter) / _entries.length;
 
-  List<MapEntry<String, double>> get _monthlyData {
+  // ── Helpers période ──────────────────────────────────────────────────
+  static String _mondayKey(DateTime dt) {
+    final m = dt.subtract(Duration(days: dt.weekday - 1));
+    return '${m.year}-${m.month.toString().padLeft(2, '0')}-${m.day.toString().padLeft(2, '0')}';
+  }
+
+  List<String> _periodKeys(StatsPeriod p) {
     final now = DateTime.now();
-    final map = <String, double>{};
-    for (int i = 5; i >= 0; i--) {
-      final m = DateTime(now.year, now.month - i);
-      map['${m.year}-${m.month.toString().padLeft(2, '0')}'] = 0;
+    switch (p) {
+      case StatsPeriod.weekly:
+        final base = now.subtract(Duration(days: now.weekday - 1));
+        return List.generate(8, (i) => _mondayKey(base.subtract(Duration(days: (7 - i) * 7))));
+      case StatsPeriod.monthly:
+        return List.generate(6, (i) {
+          final m = DateTime(now.year, now.month - (5 - i));
+          return '${m.year}-${m.month.toString().padLeft(2, '0')}';
+        });
+      case StatsPeriod.yearly:
+        return List.generate(5, (i) => '${now.year - (4 - i)}');
     }
+  }
+
+  String _entryKey(String date, StatsPeriod p) {
+    switch (p) {
+      case StatsPeriod.weekly: return _mondayKey(DateTime.parse(date));
+      case StatsPeriod.monthly: return date.substring(0, 7);
+      case StatsPeriod.yearly: return date.substring(0, 4);
+    }
+  }
+
+  // ── Dépenses ─────────────────────────────────────────────────────────
+  List<MapEntry<String, double>> _spendingData(StatsPeriod p) {
+    final keys = _periodKeys(p);
+    final map = {for (final k in keys) k: 0.0};
     for (final e in _entries) {
-      final key = e.date.substring(0, 7);
+      final key = _entryKey(e.date, p);
       if (map.containsKey(key)) map[key] = map[key]! + e.totalCost;
     }
-    return map.entries.toList();
+    return keys.map((k) => MapEntry(k, map[k]!)).toList();
   }
 
-  List<FlSpot> get _priceTrend {
-    final sorted = [..._entries]..sort((a, b) => a.date.compareTo(b.date));
-    return sorted
-        .asMap()
-        .entries
-        .map((e) => FlSpot(e.key.toDouble(), e.value.pricePerLiter))
-        .toList();
+  // ── Prix moyen/L ─────────────────────────────────────────────────────
+  List<MapEntry<String, double>> _priceData(StatsPeriod p) {
+    final keys = _periodKeys(p);
+    final map = {for (final k in keys) k: <double>[]};
+    for (final e in _entries) {
+      final key = _entryKey(e.date, p);
+      if (map.containsKey(key)) map[key]!.add(e.pricePerLiter);
+    }
+    return keys.map((k) {
+      final vals = map[k]!;
+      final avg = vals.isEmpty ? 0.0 : vals.reduce((a, b) => a + b) / vals.length;
+      return MapEntry(k, avg);
+    }).toList();
   }
 
-  // Calcule les points (date, L/100km) par véhicule entre pleins consécutifs
+  // ── Consommation L/100km ─────────────────────────────────────────────
   List<(String, double)> get _consumptionPoints {
     final result = <(String, double)>[];
-    // Grouper par véhicule pour conserver la séquence d'odomètre
     final byVehicle = <int, List<FuelEntry>>{};
     for (final e in _entries.where((e) => e.odometer != null)) {
       byVehicle.putIfAbsent(e.vehicleId, () => []).add(e);
@@ -88,48 +115,17 @@ class _StatsScreenState extends State<StatsScreen> {
     return result;
   }
 
-  List<MapEntry<String, double>> get _monthlyConsumption {
-    final now = DateTime.now();
-    final map = <String, List<double>>{};
-    for (int i = 5; i >= 0; i--) {
-      final m = DateTime(now.year, now.month - i);
-      map['${m.year}-${m.month.toString().padLeft(2, '0')}'] = [];
-    }
+  List<MapEntry<String, double>> _consumptionData(StatsPeriod p) {
+    final keys = _periodKeys(p);
+    final map = {for (final k in keys) k: <double>[]};
     for (final (date, conso) in _consumptionPoints) {
-      final key = date.substring(0, 7);
+      final key = _entryKey(date, p);
       if (map.containsKey(key)) map[key]!.add(conso);
     }
-    return map.entries.map((e) {
-      final avg = e.value.isEmpty
-          ? 0.0
-          : e.value.reduce((a, b) => a + b) / e.value.length;
-      return MapEntry(e.key, avg);
-    }).toList();
-  }
-
-  List<MapEntry<String, double>> get _weeklyConsumption {
-    final now = DateTime.now();
-    // Lundi de la semaine courante
-    final thisMonday = now.subtract(Duration(days: now.weekday - 1));
-    final map = <String, List<double>>{};
-    for (int i = 7; i >= 0; i--) {
-      final monday = thisMonday.subtract(Duration(days: i * 7));
-      final key =
-          '${monday.year}-${monday.month.toString().padLeft(2, '0')}-${monday.day.toString().padLeft(2, '0')}';
-      map[key] = [];
-    }
-    for (final (date, conso) in _consumptionPoints) {
-      final dt = DateTime.parse(date);
-      final monday = dt.subtract(Duration(days: dt.weekday - 1));
-      final key =
-          '${monday.year}-${monday.month.toString().padLeft(2, '0')}-${monday.day.toString().padLeft(2, '0')}';
-      if (map.containsKey(key)) map[key]!.add(conso);
-    }
-    return map.entries.map((e) {
-      final avg = e.value.isEmpty
-          ? 0.0
-          : e.value.reduce((a, b) => a + b) / e.value.length;
-      return MapEntry(e.key, avg);
+    return keys.map((k) {
+      final vals = map[k]!;
+      final avg = vals.isEmpty ? 0.0 : vals.reduce((a, b) => a + b) / vals.length;
+      return MapEntry(k, avg);
     }).toList();
   }
 
@@ -180,44 +176,73 @@ class _StatsScreenState extends State<StatsScreen> {
                             const DropdownMenuItem(
                                 value: null,
                                 child: Text('Tous les véhicules')),
-                            ..._vehicles.map((v) => DropdownMenuItem(
-                                value: v, child: Text(v.name))),
+                            ..._vehicles.map((v) =>
+                                DropdownMenuItem(value: v, child: Text(v.name))),
                           ],
-                          onChanged: (v) =>
-                              setState(() => _selectedVehicle = v),
+                          onChanged: (v) => setState(() => _selectedVehicle = v),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 16),
                       ],
+
+                      // Toggle période global
+                      SegmentedButton<StatsPeriod>(
+                        segments: const [
+                          ButtonSegment(
+                            value: StatsPeriod.weekly,
+                            label: Text('Semaine'),
+                            icon: Icon(Icons.view_week_outlined),
+                          ),
+                          ButtonSegment(
+                            value: StatsPeriod.monthly,
+                            label: Text('Mois'),
+                            icon: Icon(Icons.calendar_month_outlined),
+                          ),
+                          ButtonSegment(
+                            value: StatsPeriod.yearly,
+                            label: Text('Année'),
+                            icon: Icon(Icons.calendar_today_outlined),
+                          ),
+                        ],
+                        selected: {_period},
+                        onSelectionChanged: (s) =>
+                            setState(() => _period = s.first),
+                      ),
+                      const SizedBox(height: 20),
 
                       // Cartes résumé
                       _SummaryRow(
                         totalSpent: _totalSpent,
                         totalLiters: _totalLiters,
                         avgPrice: _avgPrice,
-                        count: _entries.length,
                       ),
                       const SizedBox(height: 24),
 
-                      // Graphique dépenses mensuelles
-                      _SectionTitle('Dépenses mensuelles (\$)'),
+                      // Dépenses
+                      _SectionTitle('Dépenses (\$)'),
                       const SizedBox(height: 8),
-                      MonthlyBarChart(data: _monthlyData),
+                      MonthlyBarChart(
+                        data: _spendingData(_period),
+                        period: _period,
+                      ),
                       const SizedBox(height: 24),
 
-                      // Graphique évolution prix/L
+                      // Prix moyen/L
                       if (_entries.length >= 2) ...[
-                        _SectionTitle('Évolution du prix au litre (\$/L)'),
+                        _SectionTitle('Prix moyen au litre (\$/L)'),
                         const SizedBox(height: 8),
-                        PriceLineChart(spots: _priceTrend),
+                        PriceLineChart(
+                          data: _priceData(_period),
+                          period: _period,
+                        ),
                         const SizedBox(height: 24),
                       ],
 
-                      // Graphique consommation L/100km
+                      // Consommation L/100km
                       _SectionTitle('Consommation moy. (L/100 km)'),
                       const SizedBox(height: 8),
                       ConsumptionChart(
-                        monthlyData: _monthlyConsumption,
-                        weeklyData: _weeklyConsumption,
+                        data: _consumptionData(_period),
+                        period: _period,
                       ),
                       const SizedBox(height: 16),
                     ],
@@ -245,13 +270,11 @@ class _SummaryRow extends StatelessWidget {
   final double totalSpent;
   final double totalLiters;
   final double avgPrice;
-  final int count;
 
   const _SummaryRow({
     required this.totalSpent,
     required this.totalLiters,
     required this.avgPrice,
-    required this.count,
   });
 
   @override
