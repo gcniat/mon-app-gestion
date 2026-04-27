@@ -92,8 +92,16 @@ class _FuelRecordsScreenState extends State<FuelRecordsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.vehicle.name),
-        subtitle: Text('${widget.vehicle.brand} ${widget.vehicle.model}'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.vehicle.name),
+            Text(
+              '${widget.vehicle.brand} ${widget.vehicle.model}',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+            ),
+          ],
+        ),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

@@ -117,8 +117,16 @@ class _FuelEntryFormScreenState extends State<FuelEntryFormScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? 'Modifier le relevé' : 'Nouveau relevé'),
-        subtitle: Text(widget.vehicle.name),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(_isEditing ? 'Modifier le relevé' : 'Nouveau relevé'),
+            Text(
+              widget.vehicle.name,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+            ),
+          ],
+        ),
       ),
       body: Form(
         key: _formKey,

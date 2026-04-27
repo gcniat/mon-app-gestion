@@ -24,7 +24,7 @@ class MonthlyBarChart extends StatelessWidget {
         BarChartData(
           alignment: BarChartAlignment.spaceAround,
           maxY: adjustedMax,
-          barTouchData: const BarTouchData(enabled: true),
+          barTouchData: BarTouchData(enabled: true),
           titlesData: FlTitlesData(
             leftTitles: const AxisTitles(
                 sideTitles: SideTitles(showTitles: false)),
